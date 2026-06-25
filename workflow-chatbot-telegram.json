@@ -1,0 +1,224 @@
+{
+  "name": "tempo_hoje",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [368, 448],
+      "id": "32c250e1-e918-4bdd-9388-5cba8da22bca",
+      "name": "Telegram Trigger",
+      "webhookId": "83b3fa99-5c77-4e67-bac4-b207473acb9d",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fb451120-4f6f-4fe1-b7ae-bdaa409ace40",
+              "name": "queue",
+              "value": "={{ $json.message.text\n    .toLowerCase()\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [592, 448],
+      "id": "dd228cd7-8cee-4440-a9e5-4f9f607d98a5",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/data/2.5/weather",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "q", "value": "={{ $json.queue }}"},
+            {"name": "appid", "value": "YOUR_OPENWEATHER_API_KEY"},
+            {"name": "units", "value": "metric"},
+            {"name": "lang", "value": "pt_br"}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [816, 448],
+      "id": "79b85639-a601-4775-b8e6-e426462c9be4",
+      "name": "HTTP Request",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3c16caeb-d915-4c4f-bca3-59471581df94",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {"type": "boolean", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1264, 448],
+      "id": "61c1a519-5715-423c-9ab6-3764cdaba4ff",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nif (item.error) {\n  const status = item.error.status;\n  \n  let error_message;\n  if (status === 401) {\n    error_message = \"API Key inválida.\";\n  } else if (status === 404) {\n    error_message = \"Cidade não encontrada.\";\n  } else {\n    error_message = `Erro inesperado (${status}).`;\n  }\n\n  return [{\n    json: {\n      success: false,\n      error_code: status,\n      error_message\n    }\n  }];\n}\n\nfunction getEmoji(id) {\n  const numId = Number(id);\n  \n  if (numId >= 200 && numId < 300) return \"⛈️\";\n  if (numId >= 300 && numId < 400) return \"🌦️\";\n  if (numId >= 500 && numId < 600) return numId === 511 ? \"🌨️\" : \"🌧️\";\n  if (numId >= 600 && numId < 700) return numId >= 611 && numId <= 616 ? \"🌨️\" : \"❄️\";\n  if (numId >= 700 && numId < 800) {\n    const atmo = new Map([\n      [701, \"🌫️\"], [711, \"💨\"], [721, \"🌁\"], [731, \"🌪️\"],\n      [741, \"🌫️\"], [751, \"🌪️\"], [761, \"🌪️\"], [762, \"🌋\"],\n      [771, \"💨\"],  [781, \"🌪️\"]\n    ]);\n    return atmo.has(numId) ? atmo.get(numId) : \"🌫️\";\n  }\n  const clear = new Map([\n    [800, \"☀️\"], [801, \"🌤️\"], [802, \"⛅\"], [803, \"🌥️\"], [804, \"☁️\"]\n  ]);\n  return clear.has(numId) ? clear.get(numId) : \"🌡️\";\n}\n\nconst weatherId = item.weather[0].id;\n\nreturn [{\n  json: {\n    success: true,\n    city: item.name,\n    country: item.sys.country,\n    temp: Math.round(item.main.temp),\n    feels_like: Math.round(item.main.feels_like),\n    description: item.weather[0].description,\n    emoji: getEmoji(weatherId),\n    humidity: item.main.humidity,\n    wind_speed: Math.round(item.wind.speed * 3.6)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 448],
+      "id": "2ca348a2-3451-4904-9aec-4f77e0cc893f",
+      "name": "Normalize"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0e43c38f-7d63-434d-9bca-5d09079a540a",
+              "name": "message",
+              "value": "=❌ {{ $json.error_message }}\n\nUse o formato: Cidade\nEx: São Paulo",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1552, 784],
+      "id": "8c70a25c-a71f-44fa-9dac-7d7335070b83",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2224, 496],
+      "id": "f9e3f8bf-10d0-4b5d-95dc-b78b855df578",
+      "name": "Send a text message",
+      "webhookId": "ea8b56ee-443d-45f7-b732-8ad56135f089",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é um meteorologista com senso de humor afiado. Com base nos dados abaixo, escreva UMA única frase engraçada e criativa em português sobre o tempo atual.\n\nSem introdução, sem explicação — apenas a frase. Use referências do cotidiano, cultura pop, situações absurdas. Varie os temas. Use no máximo 1 emoji.\n\nRetorne APENAS JSON válido sem markdown: {\"message\":\"...\",\"ok\":true}\n\nCidade: {{ $json.city }}, {{ $json.country }}\nTemperatura: {{ $json.temp }}°C • sensação {{ $json.feels_like }}°C\nUmidade: {{ $json.humidity }}%\nVento: {{ $json.wind_speed }} km/h\nCondição: {{ $json.description }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [1552, 320],
+      "id": "941ce2d7-4f49-4237-b019-4cc7e65de959",
+      "name": "Basic LLM Chain",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1760, 560],
+      "id": "82087178-679b-4d1c-a0cd-e5228656ee37",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmItem = $input.first().json;\nconst weatherItem = $('Normalize').first().json;\nconst nextYear = new Date().getFullYear() + 1;\n\nconst capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);\n\n// LLM funcionou — extrai JSON\nif (llmItem.text) {\n  try {\n    const cleaned = llmItem.text.replace(/```json|```/g, '').trim();\n    const parsed = JSON.parse(cleaned);\n    return [{\n      json: {\n        ...weatherItem,\n        message: `${weatherItem.emoji} *${weatherItem.city}, ${weatherItem.country}*\\n${capitalize(weatherItem.description)}\\n\\n🌡️ ${weatherItem.temp}°C • sensação ${weatherItem.feels_like}°C\\n💧 Umidade: ${weatherItem.humidity}%\\n💨 Vento: ${weatherItem.wind_speed} km/h\\n\\n${parsed.message}`\n      }\n    }];\n  } catch(e) {}\n}\n\n// Fallback — usa dados do Normalize\nconst { temp, humidity, wind_speed, city, country, emoji, description, feels_like } = weatherItem;\n\nlet laundry;\nif (humidity >= 90) {\n  laundry = `Lavar roupa hoje? Vai secar em ${nextYear}. 💀`;\n} else if (humidity >= 70) {\n  laundry = \"Pode lavar, mas vai torcer na mão mesmo — o sol não vai ajudar.\";\n} else if (wind_speed > 30) {\n  laundry = \"Ótimo dia pra lavar! Só não estende na janela ou vai ter lingerie voando pelo bairro. 🌪️\";\n} else if (temp > 25 && humidity < 60) {\n  laundry = \"Dia perfeito! Lava roupa, estende e já seca antes do almoço. 👕☀️\";\n} else {\n  laundry = \"Dia razoável. Lava roupa se quiser, mas sem pressa.\";\n}\n\nreturn [{\n  json: {\n    ...weatherItem,\n    message: `${emoji} *${city}, ${country}*\\n${capitalize(description)}\\n\\n🌡️ ${temp}°C • sensação ${feels_like}°C\\n💧 Umidade: ${humidity}%\\n💨 Vento: ${wind_speed} km/h\\n\\n${laundry}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1904, 320],
+      "id": "9cf3fd57-3515-4097-a670-7e1c289a0eb9",
+      "name": "Fallback"
+    },
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{"node": "Edit Fields1", "type": "main", "index": 0}]]
+    },
+    "Edit Fields1": {
+      "main": [[{"node": "HTTP Request", "type": "main", "index": 0}]]
+    },
+    "HTTP Request": {
+      "main": [[{"node": "Normalize", "type": "main", "index": 0}]]
+    },
+    "If": {
+      "main": [
+        [{"node": "Basic LLM Chain", "type": "main", "index": 0}],
+        [{"node": "Edit Fields2", "type": "main", "index": 0}]
+      ]
+    },
+    "Normalize": {
+      "main": [[{"node": "If", "type": "main", "index": 0}]]
+    },
+    "Edit Fields2": {
+      "main": [[{"node": "Send a text message", "type": "main", "index": 0}]]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [[{"node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Basic LLM Chain": {
+      "main": [[{"node": "Fallback", "type": "main", "index": 0}]]
+    },
+    "Fallback": {
+      "main": [[{"node": "Send a text message", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6ddcb9cc-93ca-4a24-9311-05eb63d421da",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

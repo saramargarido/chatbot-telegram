@@ -1,0 +1,111 @@
+services:
+  n8n-editor:
+    image: n8nio/n8n:1.122.4
+    container_name: n8n-editor-ftr
+    ports:
+      - 5678:5678
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    environment:
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+      ## Postgres configuration
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=postgres
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=postgres
+      ## Queue mode
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
+      ## Webhook URL — substitua pela sua URL pública (ngrok, localtunnel, cloudflare, etc.)
+      - WEBHOOK_URL=https://YOUR_TUNNEL_URL
+    networks:
+      - n8n-ftr
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
+  n8n-worker:
+    image: n8nio/n8n:1.122.4
+    command: worker
+    ports:
+      - 5679:5678
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    environment:
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+      ## Postgres configuration
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=postgres
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=postgres
+      ## Queue mode
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
+      ## Webhook URL — substitua pela sua URL pública
+      - WEBHOOK_URL=https://YOUR_TUNNEL_URL
+    networks:
+      - n8n-ftr
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
+  postgres:
+    image: ankane/pgvector
+    ports:
+      - 5432:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    networks:
+      - n8n-ftr
+    restart: always
+
+  redis:
+    image: redis:alpine
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis-data:/data
+    networks:
+      - n8n-ftr
+    restart: always
+
+  ## Tunnel para expor n8n localmente via HTTPS
+  ## Opção 1: ngrok (requer conta em ngrok.com)
+  # ngrok:
+  #   image: ngrok/ngrok:latest
+  #   ports:
+  #     - 4040:4040
+  #   command: http --url=YOUR_NGROK_STATIC_DOMAIN n8n-editor-ftr:5678
+  #   environment:
+  #     - NGROK_AUTHTOKEN=YOUR_NGROK_AUTHTOKEN
+  #   restart: always
+  #   networks:
+  #     - n8n-ftr
+  #   depends_on:
+  #     - n8n-editor
+
+networks:
+  n8n-ftr:
+    driver: bridge
